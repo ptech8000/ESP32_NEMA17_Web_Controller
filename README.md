@@ -23,11 +23,11 @@
 
 ### Motor Controller
 
-![ESP32 NEMA 17 Motor Controller](images/project.jpg)
+![ESP32 NEMA 17 Motor Controller](images/nema17_motor_controller.jpg)
 
 ### Web Interface
 
-![Web Interface](images/web-interface.png)
+![Web Interface](images/nema17_web_interface.jpg)
 
 
 
@@ -102,7 +102,7 @@ The A4988 motor supply should be within its supported motor-voltage range. For t
 
 ---
 
-# 🔌 Wiring
+#  🔌 Wiring
 
 ## ESP32 → A4988
 
@@ -482,17 +482,13 @@ ESP32_NEMA17_Web_Controller/
 ├── ESP32_NEMA17_Web_Controller.ino
 │
 ├── images/
-│   ├── project.jpg
-│   ├── web-interface.png
-│   └── wiring.png
+│   ├── nema17_motor_controller.jpg
+│   └── nema17_web_interface.jpg
 │
 ├── README.md
 │
-├── LICENSE
-│
-└── .gitignore
+└── LICENSE
 ```
-
 
 #  Possible Applications
 
@@ -508,7 +504,7 @@ This controller can serve as the foundation for:
 *  CNC mechanisms
 *  Motorized camera systems
 *  Agricultural automation
-*  Circuit Diagonstics
+*  Circuit Diagnostics
 
 ---
 
@@ -532,7 +528,6 @@ This controller can serve as the foundation for:
 | Position tracking     | Software-based    |
 
 ---
-
 
 # 👨‍💻 Author
 
