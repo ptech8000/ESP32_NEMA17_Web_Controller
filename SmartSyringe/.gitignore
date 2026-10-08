@@ -1,0 +1,23 @@
+# Local credentials — NEVER commit these files
+Secrets.h
+secrets.h
+*.secret
+*.secrets
+.env
+.env.*
+
+# Arduino / build artifacts
+build/
+*.elf
+*.bin
+*.hex
+*.map
+*.eep
+*.o
+*.d
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
