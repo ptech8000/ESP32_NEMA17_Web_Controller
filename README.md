@@ -1,559 +1,142 @@
-# ESP32 NEMA 17 Web Motor Controller
+# P-TECH ESP32 NEMA 17 Web Controller & SmartSyringe Engineering Platform
 
-> A Wi-Fi-enabled stepper motor controller built with an **ESP32 DevKit**, **A4988 stepper driver**, and **NEMA 17 stepper motor**. Control the motor from any phone, tablet, or computer connected to the ESP32's Wi-Fi access point through a simple web interface.
+ESP32-based stepper-motor control platform built around an **A4988 driver** and **NEMA 17 motor**, extended with the P-TECH SmartSyringe engineering/bench-testing software.
 
-##  Features
+> **Important:** SmartSyringe is an engineering/bench-testing project. It is **not for use on patients** and does not establish clinical performance, regulatory compliance, or certification.
 
-*  Built-in ESP32 Wi-Fi Access Point
-*  Browser-based motor control interface
-*  Configurable number of steps
-*  Adjustable step speed
-*  Forward and reverse movement
-*  Emergency motor stop
-*  Software position tracking
-*  Position reset
-*  A4988 STEP/DIR/ENABLE control
-*  Works from phones, tablets, and computers
-*  No Internet connection required
-*  Simple and expandable architecture
+## Repository
 
----
+- ESP32 NEMA 17 controller
+- A4988 STEP/DIR/ENABLE motor control
+- Web-based local control
+- SmartSyringe progressive motion firmware
+- HX711 load-cell integration
+- HOME/MAX limit monitoring
+- Motor-current/occlusion monitoring
+- MQTT/TLS telemetry and commands
+- Engineering validation and analysis dashboard
 
-##  Project Preview
+## Hardware
 
-### Motor Controller
+| Component | Purpose |
+|---|---|
+| ESP32 DevKit | Main controller and web server |
+| A4988 | NEMA 17 stepper driver |
+| NEMA 17 | Linear/rotary actuator |
+| HX711 + load cell | Gravimetric measurement |
+| HOME limit switch | Homing reference |
+| MAX limit switch | Travel protection |
+| Motor-current sensor | Current/occlusion monitoring |
+| External motor supply | A4988 motor power |
 
-![ESP32 NEMA 17 Motor Controller](images/nema17_motor_controller.jpg)
+## Original NEMA 17 Controller
 
-### Web Interface
+![NEMA 17 Motor Controller](images/nema17_motor_controller.jpg)
 
-![Web Interface](images/nema17_web_interface.jpg)
+The original controller uses GPIO 25 for STEP, GPIO 26 for DIR and GPIO 27 for ENABLE.
 
+## SmartSyringe Engineering Build
 
+The current engineering design uses a calibrated 60 mL syringe travel of 12,463 steps (about 207.7167 steps/mL), with acceleration/deceleration, homing, MAX protection, HX711 measurement, current monitoring, MQTT, and a browser dashboard. The firmware source also explicitly requires homing and enforces a maximum configured flow rate. These are engineering controls, not clinical validation.
 
----
-
-##  Project Architecture
-
-```mermaid
-flowchart LR
-
-    A[ Phone /  PC] 
-        -->|Wi-Fi| B[ESP32 Web Server]
-
-    B -->|STEP| C[A4988 Driver]
-    B -->|DIR| C
-    B -->|ENABLE| C
-
-    D[12V-24V Motor Supply] --> C
-
-    C -->|Coil A| E[NEMA 17]
-    C -->|Coil B| E
-```
-
-### Control Flow
+### SmartSyringe folder
 
 ```text
-User
- │
- │ Wi-Fi
- ▼
-ESP32 Web Interface
- │
- ├── Steps
- ├── Speed
- ├── Direction
- ├── Stop
- └── Position Reset
- │
- ▼
-ESP32 Motor Controller
- │
- ├── STEP
- ├── DIR
- └── ENABLE
- │
- ▼
-A4988 Stepper Driver
- │
- ▼
-NEMA 17 Stepper Motor
+SmartSyringe/
+├── syringe_pump_v3.ino
+├── PTECH_Smart_Syringe_Pump_v8_Engineering_Dashboard_GRAPH.inc
+├── dashboard_html.h
+├── PumpTypes.h
+├── Secrets.example.h
+└── .gitignore
 ```
 
----
+### Credentials
 
-#  Hardware
+**No real Wi-Fi, MQTT, dashboard passwords, API keys, or private certificates belong in this repository.**
 
-| Component                      |    Quantity | Purpose                      |
-| ------------------------------ | ----------: | ---------------------------- |
-| ESP32 DevKit                   |           1 | Main controller & web server |
-| A4988                          |           1 | Stepper motor driver         |
-| NEMA 17                        |           1 | Stepper motor                |
-| 12–24 V DC Power Supply        |           1 | Motor power                  |
-| Electrolytic capacitor ≥100 µF |           1 | VMOT filtering               |
-| Breadboard                     |           1 | Prototyping                  |
-| Jumper wires                   | As required | Connections                  |
+Create a local `Secrets.h` from `SmartSyringe/Secrets.example.h` and fill in your own values. `Secrets.h`, `.env` files and other secret patterns are excluded by `.gitignore`.
 
-### Recommended Motor Supply
+If a credential that was previously exposed has been used in a real deployment, rotate/revoke it at the provider before using the cleaned repository.
 
-The A4988 motor supply should be within its supported motor-voltage range. For this project, a **12 V supply** is a practical starting point.
+## SmartSyringe Safety Notice
 
-**Do not power the NEMA 17 directly from the ESP32.**
+This repository is for **educational, engineering and controlled bench testing**. Do not connect it to a patient or use it for medication delivery. Validation features such as gravimetric accuracy, repeatability, occlusion response, limit checks and network recovery are engineering tests and are not a substitute for medical-device verification/validation.
 
----
+## Arduino Libraries
 
-#  🔌 Wiring
+The engineering firmware uses:
 
-## ESP32 → A4988
-
-| ESP32 GPIO | A4988  | Function      |
-| ---------: | ------ | ------------- |
-|    GPIO 25 | STEP   | Step pulse    |
-|    GPIO 26 | DIR    | Direction     |
-|    GPIO 27 | ENABLE | Driver enable |
-|      3.3 V | VDD    | Logic supply  |
-|        GND | GND    | Common ground |
-
-## A4988 → NEMA 17
-
-The motor has four wires representing two independent coils.
-
-For the motor used during development:
-
-| Motor wire | A4988 |
-| ---------- | ----- |
-| Red        | 1A    |
-| Blue       | 1B    |
-| Green      | 2A    |
-| Black      | 2B    |
-
-**Important:** Wire colors are not universal. If using another NEMA 17, identify the two coil pairs with a multimeter before connecting it.
-
-### Motor Power
-
-```text
-External PSU (+)
-       │
-       ▼
-     VMOT
-     A4988
-     GND
-       ▲
-       │
-External PSU (-)
+```cpp
+WiFi
+WiFiClientSecure
+PubSubClient
+AccelStepper
+HX711
+ArduinoJson
+WebServer
 ```
 
-Connect a **100 µF or larger electrolytic capacitor** close to the A4988 between `VMOT` and `GND`.
+Install the corresponding ESP32 board support and libraries in Arduino IDE before compiling.
 
----
+## Original Controller API
 
-#  A4988 Configuration
-
-For the initial setup, the driver can be operated in **full-step mode**.
+The original local motor controller exposes endpoints such as:
 
 ```text
-MS1 = LOW
-MS2 = LOW
-MS3 = LOW
-```
-
-A typical 1.8° NEMA 17 has:
-
-```text
-200 full steps / revolution
-```
-
-Therefore:
-
-| Steps | Approx. movement |
-| ----: | ---------------: |
-|    50 |              90° |
-|   100 |             180° |
-|   200 |             360° |
-|   400 |    2 revolutions |
-|  1000 |    5 revolutions |
-
-Actual positioning depends on the motor, microstepping configuration, and mechanical system.
-
----
-
-#  Web Interface
-
-After powering the ESP32, connect your phone or computer to:
-
-```text
-Wi-Fi SSID:
-NEMA17_MOTOR
-```
-
-Default password:
-
-```text
-12345678
-```
-
-Then open:
-
-```text
-http://192.168.4.1
-```
-
-The interface provides:
-
-```text
-┌──────────────────────────────┐
-│       P-TECH                 │
-│   NEMA 17 MOTOR CONTROL      │
-├──────────────────────────────┤
-│                              │
-│ Steps: [ 200             ]   │
-│                              │
-│ Speed: [ 500 steps/sec   ]   │
-│                              │
-│ [ ◀ REVERSE ] [ FORWARD ▶ ]  │
-│                              │
-│          [ STOP ]             │
-│                              │
-│ Position: 200 steps          │
-│ Motor: Stopped               │
-│                              │
-│     [ RESET POSITION ]       │
-└──────────────────────────────┘
-```
-
----
-
-#  Motor Controls
-
-### Forward
-
-Moves the motor in the forward direction by the number of steps specified.
-
-Example:
-
-```text
-Steps = 200
-```
-
-The motor performs approximately:
-
-```text
-1 revolution
-```
-
-with a standard 1.8° motor in full-step mode.
-
-### Reverse
-
-Moves the specified number of steps in the opposite direction.
-
-### Speed
-
-Controls the approximate stepping frequency.
-
-Example:
-
-```text
-500 steps/sec
-```
-
-### Stop
-
-Immediately stops issuing additional step pulses.
-
-### Reset Position
-
-Sets the software position counter back to:
-
-```text
-0
-```
-
-> The position is software-based and is not an absolute physical position. For true absolute positioning, add a limit switch, homing sensor, encoder, or other position reference.
-
----
-
-#  API Endpoints
-
-The ESP32 exposes simple HTTP endpoints.
-
-| Endpoint  | Method | Description             |
-| --------- | ------ | ----------------------- |
-| `/`       | GET    | Web control interface   |
-| `/move`   | GET    | Move motor              |
-| `/stop`   | GET    | Stop motor              |
-| `/reset`  | GET    | Reset software position |
-| `/status` | GET    | Return motor status     |
-
-## Move Motor
-
-Example:
-
-```text
-/move?steps=200&direction=forward&speed=500
-```
-
-Parameters:
-
-| Parameter   | Example   | Description            |
-| ----------- | --------- | ---------------------- |
-| `steps`     | `200`     | Number of steps        |
-| `direction` | `forward` | `forward` or `reverse` |
-| `speed`     | `500`     | Steps per second       |
-
-Example reverse command:
-
-```text
-/move?steps=400&direction=reverse&speed=300
-```
-
----
-
-## Status API
-
-Request:
-
-```text
+/
+/move
+/stop
+/reset
 /status
 ```
 
-Example response:
+Do not copy credentials from old screenshots or documentation into a public deployment. Configure authentication and network access for your own environment.
 
-```json
-{
-  "position": 200,
-  "running": false
-}
+## Images
+
+Project images are kept under `images/` so README previews remain organized with the source. Existing repository images are retained rather than publishing unrelated personal/project photos.
+
+## Project Architecture
+
+```mermaid
+flowchart LR
+    U[Phone / PC] -->|Wi-Fi| W[ESP32 Web Dashboard]
+    W --> C[Pump Controller]
+    C --> D[A4988]
+    D --> M[NEMA 17]
+    C --> H[HX711 + Load Cell]
+    C --> L[HOME / MAX Limits]
+    C --> S[Current / Occlusion Monitor]
+    C --> Q[MQTT / TLS]
 ```
 
-This makes the project easy to integrate with:
+## Calibration / Engineering Data
 
-* Mobile applications
-* PWAs
-* JavaScript interfaces
-* Home automation systems
-* Robotics control systems
-* REST-based automation systems
+The current engineering source documents:
 
----
+- 60 mL maximum syringe volume
+- 12,463 calibrated steps for the full travel
+- 1.25 mm lead-screw pitch
+- 200 motor steps/revolution
+- 16 microsteps
+- GPIO 25 STEP
+- GPIO 26 DIR
+- GPIO 27 ENABLE
+- GPIO 32 HOME
+- GPIO 33 MAX
+- GPIO 16 HX711 DOUT
+- GPIO 17 HX711 SCK
+- GPIO 34 motor-current ADC
 
-#  Software Requirements
+Treat these as project configuration values that must be verified against the physical build before any bench test.
 
-### Arduino IDE
+## Author
 
-Recommended:
+**P-TECH — Precision Technology, Engineering & Creative Hardware**
 
-```text
-Arduino IDE 1.8.x or newer
-```
+GitHub: `ptech8000`
 
-### ESP32 Board Package
+## License
 
-Install the ESP32 board support through the Arduino IDE Board Manager.
-
-Select:
-
-```text
-Board:
-ESP32 Dev Module
-```
-
-### Required Libraries
-
-The project uses the standard ESP32 libraries:
-
-```cpp
-#include <WiFi.h>
-#include <WebServer.h>
-```
-
-No external web-server library is required.
-
----
-
-#  Installation
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/ptech8000/ESP32_NEMA17_Web_Controller.git
-```
-
-### 2. Open the project
-
-Open:
-
-```text
-ESP32_NEMA17_Web_Controller.ino
-```
-
-in Arduino IDE.
-
-### 3. Select your ESP32
-
-Go to:
-
-```text
-Tools → Board → ESP32 Arduino → ESP32 Dev Module
-```
-
-### 4. Select the correct COM port
-
-```text
-Tools → Port → COMx
-```
-
-### 5. Upload
-
-Click:
-
-```text
-Upload
-```
-
-### 6. Open Serial Monitor
-
-Set:
-
-```text
-Baud Rate: 115200
-```
-
-You should see something similar to:
-
-```text
-================================
-P-TECH NEMA 17 CONTROLLER
-================================
-
-WiFi SSID: NEMA17_MOTOR
-Password: 12345678
-
-Open: http://192.168.4.1
-
-Web server started.
-```
-
----
-
-#  Safety & Hardware Notes
-
-### Never disconnect the motor while the A4988 is powered
-
-Disconnecting the motor while the driver is energized can damage the A4988.
-
-### Set the current limit correctly
-
-The A4988 current limit must be adjusted according to the NEMA 17 motor's rated current and the particular A4988 module.
-
-An incorrect setting can cause:
-
-* Motor overheating
-* Driver overheating
-* Missed steps
-* Poor torque
-* Driver failure
-
-### Use a separate motor power supply
-
-Do not attempt to power the NEMA 17 from:
-
-```text
-ESP32 3.3 V
-```
-
-or:
-
-```text
-ESP32 5 V
-```
-
-### Common ground
-
-The ESP32 and A4988 logic ground must share a common ground.
-
----
-
-#  Project Structure
-
-```text
-ESP32_NEMA17_Web_Controller/
-│
-├── ESP32_NEMA17_Web_Controller.ino
-│
-├── images/
-│   ├── nema17_motor_controller.jpg
-│   └── nema17_web_interface.jpg
-│
-├── README.md
-│
-└── LICENSE
-```
-
-#  Possible Applications
-
-This controller can serve as the foundation for:
-
-*  Robotics
-*  Linear actuators
-*  Camera sliders
-*  Pan/tilt mechanisms
-*  Automation systems
-*  Automated dispensing systems
-*  Laboratory equipment
-*  CNC mechanisms
-*  Motorized camera systems
-*  Agricultural automation
-*  Circuit Diagnostics
-
----
-
-#  Technical Specifications
-
-| Parameter             | Value             |
-| --------------------- | ----------------- |
-| Controller            | ESP32 DevKit      |
-| Driver                | A4988             |
-| Motor                 | NEMA 17           |
-| Control               | STEP / DIR        |
-| STEP GPIO             | GPIO 25           |
-| DIR GPIO              | GPIO 26           |
-| ENABLE GPIO           | GPIO 27           |
-| Wi-Fi                 | ESP32 SoftAP      |
-| Default SSID          | `NEMA17_MOTOR`    |
-| Web server            | ESP32 `WebServer` |
-| Default IP            | `192.168.4.1`     |
-| Default speed         | 500 steps/sec     |
-| Default test movement | 200 steps         |
-| Position tracking     | Software-based    |
-
----
-
-# 👨‍💻 Author
-
-**P-TECH**
-
-Precision Technology, Engineering & Creative Hardware
-
-📧 `ptech8000@gmail.com`
-📞 `09069001906`
-
-GitHub: **[@ptech8000](https://github.com/ptech8000)**
-
----
-
-##  Support the Project
-
-If this project is useful to you:
-
-*  Star the repository
-*  Fork the project
-*  Report issues
-*  Suggest improvements
-*  Build your own version
-
----
-
-### Repository tagline
-
-> **A simple, wireless, browser-controlled NEMA 17 stepper motor platform powered by ESP32 and A4988.**
+See [`LICENSE`](LICENSE).
