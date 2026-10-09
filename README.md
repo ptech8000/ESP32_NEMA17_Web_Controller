@@ -1,135 +1,314 @@
-# P-TECH ESP32 NEMA 17 Web Controller & SmartSyringe Engineering Platform
+# P-TECH ESP32 NEMA 17 Web Controller
 
-ESP32-based stepper-motor control platform built around an **A4988 driver** and **NEMA 17 motor**, extended with the P-TECH SmartSyringe engineering/bench-testing software.
+A lightweight **ESP32-based web controller for a NEMA 17 stepper motor using an A4988 driver**. The ESP32 creates its own Wi-Fi access point and hosts the control interface directly, so the controller does not require an external router, cloud service, or internet connection.
 
-> **Important:** SmartSyringe is an engineering/bench-testing project. It is **not for use on patients** and does not establish clinical performance, regulatory compliance, or certification.
+![NEMA 17 Motor Controller](images/nema17_motor_controller.jpg)
 
-## Repository
+> **Engineering note:** The current `main` branch contains the standalone NEMA 17 controller firmware documented below. It is intended for educational, prototyping, and controlled engineering use.
 
-- ESP32 NEMA 17 controller
-- A4988 STEP/DIR/ENABLE motor control
-- Web-based local control
-- SmartSyringe progressive motion firmware
-- HX711 load-cell integration
-- HOME/MAX limit monitoring
-- Motor-current/occlusion monitoring
-- MQTT/TLS telemetry and commands
-- Engineering validation and analysis dashboard
+## Features
+
+- ESP32 SoftAP / access-point operation
+- Browser-based motor control
+- Forward and reverse movement
+- Configurable movement distance in steps
+- Configurable speed from **1–5000 steps/second**
+- Real-time software position display
+- Start/stop control
+- Software position reset
+- A4988 STEP/DIR/ENABLE control
+- HTTP API for external control
+- Mobile- and desktop-friendly interface
+- No third-party motor-control library required
+
+## How It Works
+
+The ESP32 runs a `WebServer` on port 80 and embeds the HTML/CSS/JavaScript interface directly in the `.ino` file.
+
+The main loop performs two operations:
+
+```cpp
+server.handleClient();
+runMotor();
+```
+
+When a movement is requested, the browser sends:
+
+```text
+GET /move?steps=<number>&direction=<forward|reverse>&speed=<1-5000>
+```
+
+The firmware validates the step count, sets the direction, limits the speed, enables the A4988, and generates STEP pulses until the requested number of steps has been completed.
+
+The browser polls `/status` every **300 ms** to update the displayed position and motor state.
+
+## System Architecture
+
+```mermaid
+flowchart LR
+    U[Phone / Laptop] -->|Wi-Fi| AP[ESP32 SoftAP]
+    AP --> WEB[Embedded Web Interface]
+    WEB --> API[HTTP API]
+    API --> CTRL[Motor Control]
+    CTRL --> STEP[GPIO 25 STEP]
+    CTRL --> DIR[GPIO 26 DIR]
+    CTRL --> EN[GPIO 27 ENABLE]
+    STEP --> A[A4988]
+    DIR --> A
+    EN --> A
+    A --> M[NEMA 17]
+```
 
 ## Hardware
 
 | Component | Purpose |
 |---|---|
-| ESP32 DevKit | Main controller and web server |
-| A4988 | NEMA 17 stepper driver |
-| NEMA 17 | Linear/rotary actuator |
-| HX711 + load cell | Gravimetric measurement |
-| HOME limit switch | Homing reference |
-| MAX limit switch | Travel protection |
-| Motor-current sensor | Current/occlusion monitoring |
-| External motor supply | A4988 motor power |
+| ESP32 DevKit | Wi-Fi controller and web server |
+| A4988 | Stepper-motor driver |
+| NEMA 17 | Stepper motor / actuator |
+| External motor supply | Powers the A4988 motor output stage |
+| USB / 5 V supply | Powers the ESP32 |
 
-## Original NEMA 17 Controller
+### ESP32 → A4988
 
-![NEMA 17 Motor Controller](images/nema17_motor_controller.jpg)
+| ESP32 GPIO | A4988 Signal | Function |
+|---:|---|---|
+| **GPIO 25** | STEP | Step pulse output |
+| **GPIO 26** | DIR | Direction control |
+| **GPIO 27** | ENABLE | Driver enable/disable |
 
-The original controller uses GPIO 25 for STEP, GPIO 26 for DIR and GPIO 27 for ENABLE.
+ENABLE is active-low in the firmware:
 
-## SmartSyringe Engineering Build
+- `LOW` → A4988 enabled
+- `HIGH` → A4988 disabled
 
-The current engineering design uses a calibrated 60 mL syringe travel of 12,463 steps (about 207.7167 steps/mL), with acceleration/deceleration, homing, MAX protection, HX711 measurement, current monitoring, MQTT, and a browser dashboard. The firmware source also explicitly requires homing and enforces a maximum configured flow rate. These are engineering controls, not clinical validation.
+The firmware does not control the A4988 MS1/MS2/MS3 microstepping pins. Microstepping therefore depends on the physical driver-module configuration.
 
-### SmartSyringe folder
+## Wi-Fi Configuration
+
+The current source contains:
+
+| Setting | Value |
+|---|---|
+| SSID | `P-TECH_MOTOR` |
+| Password | `12345678` |
+| Mode | ESP32 SoftAP |
+| Port | `80` |
+| Protocol | HTTP |
+
+At startup, the firmware prints the actual SoftAP IP address to the Serial Monitor.
+
+### Basic Use
+
+1. Upload `ESP32_NEMA17_Web_Controller.ino` to the ESP32.
+2. Open the Serial Monitor at **115200 baud**.
+3. Connect your phone/laptop to **`P-TECH_MOTOR`**.
+4. Open the SoftAP IP address shown in the Serial Monitor.
+5. Enter the required number of steps and speed.
+6. Select **FORWARD** or **REVERSE**.
+7. Use **STOP** to stop an active movement.
+8. Use **RESET POSITION** to reset the software position counter.
+
+> **Security:** The Wi-Fi password is currently stored in the source code. Change it before using the controller where unauthorized access is possible.
+
+## Web Interface
+
+The built-in page contains:
+
+### Movement Controls
+
+- **Steps** — requested number of step pulses.
+- **Speed** — requested step rate in steps/second.
+- **FORWARD** — sets `DIR_PIN` HIGH.
+- **REVERSE** — sets `DIR_PIN` LOW.
+- **STOP** — stops motion and disables the driver.
+- **RESET POSITION** — sets the software position to zero without physically moving the motor.
+
+### Status
+
+The page displays:
+
+- Current software position in steps
+- `Running` / `Stopped` motor state
+
+## HTTP API
+
+### `GET /`
+
+Returns the embedded web interface.
+
+### `GET /move`
+
+Starts a movement.
+
+Example:
 
 ```text
-SmartSyringe/
-├── syringe_pump_v3.ino
-├── PTECH_Smart_Syringe_Pump_v8_Engineering_Dashboard_GRAPH.inc
-├── dashboard_html.h
-├── PumpTypes.h
-├── Secrets.example.h
-└── .gitignore
+/move?steps=200&direction=forward&speed=500
 ```
 
-### Credentials
+| Parameter | Required | Description |
+|---|---|---|
+| `steps` | Yes | Positive number of steps |
+| `direction` | No | `forward` or reverse |
+| `speed` | No | 1–5000 steps/s |
 
-**No real Wi-Fi, MQTT, dashboard passwords, API keys, or private certificates belong in this repository.**
+Response:
 
-Create a local `Secrets.h` from `SmartSyringe/Secrets.example.h` and fill in your own values. `Secrets.h`, `.env` files and other secret patterns are excluded by `.gitignore`.
+```text
+Motor started
+```
 
-If a credential that was previously exposed has been used in a real deployment, rotate/revoke it at the provider before using the cleaned repository.
+### `GET /stop`
 
-## SmartSyringe Safety Notice
+Stops the current movement, clears the remaining step count, and disables the A4988.
 
-This repository is for **educational, engineering and controlled bench testing**. Do not connect it to a patient or use it for medication delivery. Validation features such as gravimetric accuracy, repeatability, occlusion response, limit checks and network recovery are engineering tests and are not a substitute for medical-device verification/validation.
+Response:
 
-## Arduino Libraries
+```text
+Motor stopped
+```
 
-The engineering firmware uses:
+### `GET /reset`
+
+Sets the software position counter to zero. It does **not** move the motor.
+
+Response:
+
+```text
+Position reset
+```
+
+### `GET /status`
+
+Returns the current software position and motor state.
+
+Example:
+
+```json
+{
+  "position": 200,
+  "running": false
+}
+```
+
+## Position Tracking
+
+The firmware uses:
 
 ```cpp
-WiFi
-WiFiClientSecure
-PubSubClient
-AccelStepper
-HX711
-ArduinoJson
-WebServer
+long currentPosition = 0;
 ```
 
-Install the corresponding ESP32 board support and libraries in Arduino IDE before compiling.
-
-## Original Controller API
-
-The original local motor controller exposes endpoints such as:
+Every generated step changes the counter:
 
 ```text
-/
-/move
-/stop
-/reset
-/status
+Forward → currentPosition++
+Reverse → currentPosition--
 ```
 
-Do not copy credentials from old screenshots or documentation into a public deployment. Configure authentication and network access for your own environment.
+This is **software position tracking only**. The current firmware has no encoder, HOME switch, MAX switch, or other absolute-position sensor. Therefore, the displayed position is not an independently verified physical position.
 
-## Images
+`RESET POSITION` only changes the counter to zero; it does not mechanically home the actuator.
 
-Project images are kept under `images/` so README previews remain organized with the source. Existing repository images are retained rather than publishing unrelated personal/project photos.
+## Speed Control
 
-## Project Architecture
+The selected speed is directly expressed in steps/second.
 
-```mermaid
-flowchart LR
-    U[Phone / PC] -->|Wi-Fi| W[ESP32 Web Dashboard]
-    W --> C[Pump Controller]
-    C --> D[A4988]
-    D --> M[NEMA 17]
-    C --> H[HX711 + Load Cell]
-    C --> L[HOME / MAX Limits]
-    C --> S[Current / Occlusion Monitor]
-    C --> Q[MQTT / TLS]
+The firmware calculates the STEP interval using:
+
+```cpp
+unsigned long interval = 1000000UL / stepSpeed;
 ```
 
-## Calibration / Engineering Data
+Current limits:
 
-The current engineering source documents:
+```text
+Minimum: 1 step/s
+Maximum: 5000 steps/s
+Default: 500 steps/s
+```
 
-- 60 mL maximum syringe volume
-- 12,463 calibrated steps for the full travel
-- 1.25 mm lead-screw pitch
-- 200 motor steps/revolution
-- 16 microsteps
-- GPIO 25 STEP
-- GPIO 26 DIR
-- GPIO 27 ENABLE
-- GPIO 32 HOME
-- GPIO 33 MAX
-- GPIO 16 HX711 DOUT
-- GPIO 17 HX711 SCK
-- GPIO 34 motor-current ADC
+The controller currently uses direct constant-speed stepping. **There is no acceleration/deceleration profile in the current root firmware.**
 
-Treat these as project configuration values that must be verified against the physical build before any bench test.
+## Motor Stop Behaviour
+
+When `/stop` is called:
+
+```text
+motorRunning = false
+remainingSteps = 0
+ENABLE = HIGH
+```
+
+When the requested number of steps reaches zero, the firmware also disables the A4988 automatically.
+
+## Current Project Structure
+
+```text
+ESP32_NEMA17_Web_Controller/
+├── ESP32_NEMA17_Web_Controller.ino   # Main firmware + embedded web UI
+├── A4988_Driver.jpg                  # A4988 reference image
+├── images/
+│   └── nema17_motor_controller.jpg   # README project image
+├── LICENSE
+└── README.md
+```
+
+The web application is currently embedded in `ESP32_NEMA17_Web_Controller.ino`; there is no separate HTML/CSS/JavaScript application directory in the current repository.
+
+## Software Requirements
+
+The firmware uses the ESP32 Arduino framework and:
+
+```cpp
+#include <WiFi.h>
+#include <WebServer.h>
+```
+
+These are supplied by the ESP32 Arduino board package. No external stepper or web-server library is required by the current firmware.
+
+Use Arduino IDE with an ESP32 board selected, upload the `.ino` file, and use **115200 baud** for the Serial Monitor.
+
+## Engineering Considerations
+
+### No physical end-stop protection
+
+The current firmware does not implement HOME or MAX limit switches. Movement is controlled by the requested step count.
+
+### No acceleration profile
+
+The current implementation does not use `AccelStepper` or another motion-profile library. High speeds, abrupt starts/stops, mechanical load, current settings, and power supply conditions can affect whether the motor maintains commanded steps.
+
+### Software position is not absolute
+
+`currentPosition` is a software counter, not encoder feedback.
+
+### A4988 current limit
+
+Set the A4988 current limit appropriately for the particular NEMA 17 motor and driver module. Incorrect settings can cause overheating, insufficient torque, or hardware damage.
+
+### Motor power
+
+Use an appropriate motor supply for the A4988/NEMA 17 combination and provide the required common ground between the ESP32 control electronics and driver logic.
+
+## Future Expansion
+
+The existing STEP/DIR/ENABLE and HTTP architecture can serve as the foundation for future actuator-control features such as:
+
+- Acceleration/deceleration
+- Physical homing and travel limits
+- Calibration-based position control
+- Flow-rate control
+- Load-cell feedback
+- Motor-current monitoring
+- Data logging
+- Interactive graphs and analysis
+- Authentication
+- MQTT/TLS telemetry
+- Progressive actuator-control workflows
+
+These are **future capabilities and are not claimed as implemented in the current root firmware unless present in the source code**.
 
 ## Author
 
